@@ -1,0 +1,69 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List
+
+from app.database import get_db
+from app.models.teacher_assignment import TeacherAssignment
+from app.models.teacher import Teacher
+from app.schemas.teacher_assignment import TeacherAssignmentCreate, TeacherAssignmentResponse
+from app.auth import get_current_teacher, get_current_admin
+
+router = APIRouter(prefix="/teacher-assignments", tags=["teacher-assignments"])
+
+
+@router.get("/", response_model=List[TeacherAssignmentResponse])
+async def list_assignments(
+    db: AsyncSession = Depends(get_db),
+    _: Teacher = Depends(get_current_teacher),
+):
+    result = await db.execute(select(TeacherAssignment))
+    return result.scalars().all()
+
+
+@router.get("/{assignment_id}", response_model=TeacherAssignmentResponse)
+async def get_assignment(
+    assignment_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Teacher = Depends(get_current_teacher),
+):
+    return await _get_or_404(db, assignment_id)
+
+
+@router.post("/", response_model=TeacherAssignmentResponse, status_code=status.HTTP_201_CREATED)
+async def create_assignment(
+    data: TeacherAssignmentCreate,
+    db: AsyncSession = Depends(get_db),
+    _: Teacher = Depends(get_current_admin),
+):
+    assignment = TeacherAssignment(
+        teacher_id=data.teacher_id,
+        cur_requirement_id=data.cur_requirement_id,
+    )
+    db.add(assignment)
+    await db.commit()
+    await db.refresh(assignment)
+    return assignment
+
+
+@router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_assignment(
+    assignment_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Teacher = Depends(get_current_admin),
+):
+    assignment = await _get_or_404(db, assignment_id)
+    await db.delete(assignment)
+    await db.commit()
+
+
+async def _get_or_404(db: AsyncSession, assignment_id: int) -> TeacherAssignment:
+    result = await db.execute(
+        select(TeacherAssignment).where(TeacherAssignment.id == assignment_id)
+    )
+    assignment = result.scalar_one_or_none()
+    if assignment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Teacher assignment not found"
+        )
+    return assignment
