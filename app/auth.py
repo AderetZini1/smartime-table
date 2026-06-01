@@ -42,9 +42,10 @@ async def get_current_teacher(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        teacher_id: int = payload.get("sub")
-        if teacher_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             raise credentials_exception
+        teacher_id = int(sub)
     except JWTError:
         raise credentials_exception
 
