@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,9 +7,6 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models.teacher import Teacher
 import os
-
-# כלי להצפנת סיסמאות
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # מגדיר שהתחברות היא דרך endpoint בשם /auth/login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -20,12 +16,12 @@ ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 def verify_password(plain_password, hashed_password):
-    """בודק אם הסיסמה שהוכנסה תואמת לhash בDB"""
-    return pwd_context.verify(plain_password, hashed_password)
+    import bcrypt
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 def hash_password(password):
-    """מצפין סיסמה לפני שמירה בDB"""
-    return pwd_context.hash(password)
+    import bcrypt
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def create_access_token(data: dict):
     """יוצר JWT token למורה שהתחבר"""
